@@ -31,6 +31,8 @@
 #include <utils/RefBase.h>
 #include <utils/String8.h>
 #include <utils/BitSet.h>
+//codewalker
+#include <cutils/properties.h>
 
 #include <stddef.h>
 #include <unistd.h>
@@ -325,6 +327,12 @@ public:
     /* Gets a pointer controller associated with the specified cursor device (ie. a mouse). */
     virtual sp<PointerControllerInterface> obtainPointerController(int32_t deviceId) = 0;
 
+	//codewalker
+    /* Gets a pointer controller associated with the specified cursor device (ie. a mouse). */
+    virtual sp<PointerControllerInterface> getZoomPointerIcon(int32_t deviceId) = 0;
+
+    /* Gets a pointer controller associated with the specified cursor device (ie. a mouse). */
+    virtual sp<PointerControllerInterface> getArrowPointerIcon(int32_t deviceId) = 0;
     /* Notifies the input reader policy that some input devices have changed
      * and provides information about all current input devices.
      */
@@ -706,6 +714,9 @@ public:
     uint32_t getButtonState() const;
 
 private:
+    //codewalker
+	char mMouseFirstButtonValue[PROPERTY_VALUE_MAX];
+	char mMouseRightButtonValue[PROPERTY_VALUE_MAX];
     bool mBtnLeft;
     bool mBtnRight;
     bool mBtnMiddle;
@@ -1213,6 +1224,8 @@ public:
 
     virtual void fadePointer();
 
+	int mCountWheelBtn;
+
 private:
     // Amount that trackball needs to move in order to generate a key event.
     static const int32_t TRACKBALL_MOVEMENT_THRESHOLD = 6;
@@ -1241,6 +1254,13 @@ private:
 
     float mVWheelScale;
     float mHWheelScale;
+
+    int mFirstPointerX;
+    int mFirstPointerY;
+    int mSecondPointerX;
+    int mSecondPointerY;
+    bool mIsZoomState;
+    int mEventNodeIndex;
 
     // Velocity controls for mouse pointer and wheel movements.
     // The controls for X and Y wheel movements are separate to keep them decoupled.

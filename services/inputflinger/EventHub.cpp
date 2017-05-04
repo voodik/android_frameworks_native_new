@@ -1393,6 +1393,12 @@ status_t EventHub::openDeviceLocked(const char *devicePath) {
          toString(mBuiltInKeyboardId == deviceId),
          wakeMechanism.string(), toString(usingClockIoctl));
 
+
+
+         if (strcmp(device->identifier.name.string(), "odroid-ts") == 0){
+         property_set("ro.voodik.odroid-ts",devicePath);
+         }
+
     addDeviceLocked(device);
     return 0;
 }

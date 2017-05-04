@@ -191,6 +191,15 @@ private:
         return mPointerControllers.valueFor(deviceId);
     }
 
+	//codewalker
+    virtual sp<PointerControllerInterface> getArrowPointerIcon(int32_t deviceId) {
+        return mPointerControllers.valueFor(deviceId);
+    }
+
+    virtual sp<PointerControllerInterface> getZoomPointerIcon(int32_t deviceId) {
+        return mPointerControllers.valueFor(deviceId);
+    }
+
     virtual void notifyInputDevicesChanged(const Vector<InputDeviceInfo>& inputDevices) {
         mInputDevices = inputDevices;
     }
