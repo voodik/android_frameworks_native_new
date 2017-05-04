@@ -93,6 +93,9 @@
 #include <ExSurfaceFlinger/ExSurfaceFlinger.h>
 #endif
 
+#ifdef USES_HWC_SERVICES
+#include "ExynosHWCService.h"
+#endif
 
 #define DISPLAY_COUNT       1
 
@@ -140,6 +143,10 @@ const String16 sDump("android.permission.DUMP");
 
 // ---------------------------------------------------------------------------
 
+#ifdef USES_HWC_SERVICES
+static bool notifyPSRExit = true;
+#endif
+
 SurfaceFlinger::SurfaceFlinger()
     :   BnSurfaceComposer(),
         mTransactionFlags(0),
@@ -167,7 +174,6 @@ SurfaceFlinger::SurfaceFlinger()
         mHWVsyncAvailable(false),
         mDaltonize(false),
         mHasColorMatrix(false),
-        mHasSecondaryColorMatrix(false),
         mHasPoweredOff(false),
         mFrameBuckets(),
         mTotalTime(0),
@@ -321,8 +327,15 @@ void SurfaceFlinger::bootFinished()
     // stop boot animation
     // formerly we would just kill the process, but we now ask it to exit so it
     // can choose where to stop the animation.
-    property_set("service.bootanim.exit", "1");
+//    property_set("service.bootanim.exit", "1");
 
+#ifdef USES_HWC_SERVICES
+    sp<IServiceManager> sm = defaultServiceManager();
+    sp<android::IExynosHWCService> hwc =
+        interface_cast<android::IExynosHWCService>(sm->getService(String16("Exynos.HWCService")));
+    ALOGD("boot finished. Inform HWC");
+    hwc->setBootFinished();
+#endif
     const int LOGTAG_SF_STOP_BOOTANIM = 60110;
     LOG_EVENT_LONG(LOGTAG_SF_STOP_BOOTANIM,
                    ns2ms(systemTime(SYSTEM_TIME_MONOTONIC)));
@@ -918,6 +931,19 @@ void SurfaceFlinger::signalTransaction() {
 }
 
 void SurfaceFlinger::signalLayerUpdate() {
+#ifdef USES_HWC_SERVICES
+    if (notifyPSRExit) {
+        notifyPSRExit = false;
+        sp<IServiceManager> sm = defaultServiceManager();
+        sp<IExynosHWCService> hwcService =
+            interface_cast<android::IExynosHWCService>(
+                sm->getService(String16("Exynos.HWCService")));
+        if (hwcService != NULL)
+            hwcService->notifyPSRExit();
+        else
+            ALOGE("HWCService::notifyPSRExit failed");
+    }
+#endif
     mEventQueue.invalidate();
 }
 
@@ -1093,6 +1119,9 @@ void SurfaceFlinger::handleMessageRefresh() {
     doDebugFlashRegions();
     doComposition();
     postComposition(refreshStartTime);
+#ifdef USES_HWC_SERVICES
+        notifyPSRExit = true;
+#endif
 }
 
 void SurfaceFlinger::doDebugFlashRegions()
@@ -1309,8 +1338,7 @@ void SurfaceFlinger::setUpHWComposer() {
                         for (size_t i=0 ; cur!=end && i<count ; ++i, ++cur) {
                             const sp<Layer>& layer(currentLayers[i]);
                             layer->setGeometry(hw, *cur);
-                            if (mDebugDisableHWC || mDebugRegion || mDaltonize || mHasColorMatrix
-                                    || mHasSecondaryColorMatrix) {
+                            if (mDebugDisableHWC || mDebugRegion || mDaltonize || mHasColorMatrix) {
                                 cur->setSkip(true);
                             }
                         }
@@ -2072,15 +2100,11 @@ void SurfaceFlinger::doDisplayComposition(const sp<const DisplayDevice>& hw,
         }
     }
 
-    if (CC_LIKELY(!mDaltonize && !mHasColorMatrix && !mHasSecondaryColorMatrix)) {
+    if (CC_LIKELY(!mDaltonize && !mHasColorMatrix)) {
         if (!doComposeSurfaces(hw, dirtyRegion)) return;
     } else {
         RenderEngine& engine(getRenderEngine());
         mat4 colorMatrix = mColorMatrix;
-        if (mHasSecondaryColorMatrix) {
-            colorMatrix = mHasColorMatrix
-                    ? (colorMatrix * mSecondaryColorMatrix) : mSecondaryColorMatrix;
-        }
         if (mDaltonize) {
             colorMatrix = colorMatrix * mDaltonizer();
         }
@@ -3162,8 +3186,7 @@ void SurfaceFlinger::dumpAllLocked(const Vector<String16>& args, size_t& index,
     result.appendFormat("  h/w composer %s and %s\n",
             hwc.initCheck()==NO_ERROR ? "present" : "not present",
                     (mDebugDisableHWC || mDebugRegion || mDaltonize
-                            || mHasColorMatrix
-                            || mHasSecondaryColorMatrix) ? "disabled" : "enabled");
+                            || mHasColorMatrix) ? "disabled" : "enabled");
     hwc.dump(result);
 
     /*
@@ -3383,27 +3406,6 @@ status_t SurfaceFlinger::onTransact(
             case 1021: { // Disable HWC virtual displays
                 n = data.readInt32();
                 mUseHwcVirtualDisplays = !n;
-                return NO_ERROR;
-            }
-            case 1030: {
-                // apply a secondary color matrix
-                // this will be combined with any other transformations
-                n = data.readInt32();
-                mHasSecondaryColorMatrix = n ? 1 : 0;
-                if (n) {
-                    // color matrix is sent as mat3 matrix followed by vec3
-                    // offset, then packed into a mat4 where the last row is
-                    // the offset and extra values are 0
-                    for (size_t i = 0 ; i < 4; i++) {
-                        for (size_t j = 0; j < 4; j++) {
-                            mSecondaryColorMatrix[i][j] = data.readFloat();
-                        }
-                    }
-                } else {
-                    mSecondaryColorMatrix = mat4();
-                }
-                invalidateHwcGeometry();
-                repaintEverything();
                 return NO_ERROR;
             }
         }
