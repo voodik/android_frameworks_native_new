@@ -327,8 +327,9 @@ void SurfaceFlinger::bootFinished()
     // stop boot animation
     // formerly we would just kill the process, but we now ask it to exit so it
     // can choose where to stop the animation.
-//    property_set("service.bootanim.exit", "1");
+    property_set("service.bootanim.exit", "1");
 
+/*
 #ifdef USES_HWC_SERVICES
     sp<IServiceManager> sm = defaultServiceManager();
     sp<android::IExynosHWCService> hwc =
@@ -336,6 +337,7 @@ void SurfaceFlinger::bootFinished()
     ALOGD("boot finished. Inform HWC");
     hwc->setBootFinished();
 #endif
+*/
     const int LOGTAG_SF_STOP_BOOTANIM = 60110;
     LOG_EVENT_LONG(LOGTAG_SF_STOP_BOOTANIM,
                    ns2ms(systemTime(SYSTEM_TIME_MONOTONIC)));
@@ -1276,12 +1278,13 @@ void SurfaceFlinger::rebuildLayerStacks() {
                         Region drawRegion(tr.transform(
                                 layer->visibleNonTransparentRegion));
                         drawRegion.andSelf(bounds);
-                        if (!drawRegion.isEmpty()) {
+                        if (!drawRegion.isEmpty() || layer->getName() == String8("BootAnimation")) {
                             layersSortedByZ.add(layer);
                         }
                     }
                 }
             }
+
             hw->setVisibleLayersSortedByZ(layersSortedByZ);
             hw->undefinedRegion.set(bounds);
             hw->undefinedRegion.subtractSelf(tr.transform(opaqueRegion));
