@@ -60,6 +60,7 @@ class HwcSidebandAgent;
  */
 class BufferLayer : public Layer, public BufferLayerConsumer::ContentsChangedListener {
 public:
+    friend class ExBufferLayer;
     BufferLayer(SurfaceFlinger* flinger, const sp<Client>& client, const String8& name, uint32_t w,
                 uint32_t h, uint32_t flags);
 
@@ -144,6 +145,10 @@ public:
     void waitNextVsync();
     void returnGpuMode();
 #endif
+    virtual bool isHDRLayer() const { return false; }
+    virtual bool hasHdrDisplay() const { return false; }
+    virtual bool canAllowGPUForProtected() const { return false; }
+    virtual bool isScreenshot() const { return false; }
 
 private:
     void onFirstRef() override;
